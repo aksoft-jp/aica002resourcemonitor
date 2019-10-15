@@ -20,6 +20,7 @@ namespace AicaProcMonitor
                 double postgres = 0;
                 int procCount = 0;
                 long serverTotal = 0;
+                long freeMemory = 0;
                 long useTotal = 0;
                 long dbTotal = 0;
                 Console.WriteLine("プロセス名\tID\t物理メモリ使用量");
@@ -48,6 +49,7 @@ namespace AicaProcMonitor
                 postgres /= 1024;
 
                 serverTotal = GetTotalMemory();
+                freeMemory = GetFreeMemory();
                 useTotal = (long)Math.Round(total, 0, MidpointRounding.AwayFromZero);
                 dbTotal = (long)Math.Round(postgres, 0, MidpointRounding.AwayFromZero);
                 Console.WriteLine("使用メモリ\t{0}\t{1}", "", useTotal);
@@ -58,7 +60,7 @@ namespace AicaProcMonitor
                 builder.Port = 5432;
                 builder.UserName = "aica";
                 builder.Password = "ai002ca";
-                builder.Host = "192.168.210.185";
+                builder.Host = "192.168.210.80";
                 using(NpgsqlConnection con = new NpgsqlConnection(builder.ToString()))
                 {
                     con.Open();
@@ -70,6 +72,7 @@ namespace AicaProcMonitor
                     sql.Append(" USEMEMORY INT8 DEFAULT 0,");
                     sql.Append(" POSTGRESQLPROCESS INT8 DEFAULT 0,");
                     sql.Append(" POSTGRESQLPROCESSMEMORY INT8 DEFAULT 0,");
+                    sql.Append(" FREEMEMORY INT8 DEFAULT 0,");
                     sql.Append(" PRIMARY KEY(ID)");
                     sql.Append(")");
                     using(NpgsqlCommand command = new NpgsqlCommand(sql.ToString(), con))
@@ -82,11 +85,13 @@ namespace AicaProcMonitor
                     sql.Append(",USEMEMORY");
                     sql.Append(",POSTGRESQLPROCESS");
                     sql.Append(",POSTGRESQLPROCESSMEMORY");
+                    sql.Append(",FREEMEMORY");
                     sql.Append(")VALUES(");
                     sql.Append(serverTotal);
                     sql.Append("," + useTotal);
                     sql.Append("," + procCount);
                     sql.Append("," + dbTotal);
+                    sql.Append("," + freeMemory);
                     sql.Append(")");
                     using (NpgsqlCommand command = new NpgsqlCommand(sql.ToString(), con))
                     {
@@ -106,12 +111,33 @@ namespace AicaProcMonitor
             using (System.Management.ManagementClass mc =
              new System.Management.ManagementClass("Win32_OperatingSystem"))
             {
-                using(System.Management.ManagementObjectCollection moc = mc.GetInstances()){
+                using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
+                {
                     foreach (System.Management.ManagementObject mo in moc)
                     {
                         //合計物理メモリ
                         UInt64 obj = (UInt64)mo["TotalVisibleMemorySize"];
                         Console.WriteLine("合計物理メモリ\t{0}\t{1}", "", obj / 1024);
+                        mo.Dispose();
+                        return (long)obj / 1024;
+                    }
+                }
+            }
+            return 0;
+        }
+        private static long GetFreeMemory()
+        {
+            
+            using (System.Management.ManagementClass mc =
+             new System.Management.ManagementClass("Win32_OperatingSystem"))
+            {
+                using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
+                {
+                    foreach (System.Management.ManagementObject mo in moc)
+                    {
+                        //合計物理メモリ
+                        UInt64 obj = (UInt64)mo["FreePhysicalMemory"];
+                        Console.WriteLine("空き物理メモリ\t{0}\t{1}", "", obj / 1024);
                         mo.Dispose();
                         return (long)obj / 1024;
                     }
